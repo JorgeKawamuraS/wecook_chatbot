@@ -1,0 +1,18 @@
+{"intents": [
+  {"tag": "greeting",
+    "patterns": ["Hi", "Como estas?", "Alguien ahi?", "Hola", "Buen dia", "Que tal", "Hey", "Saludos"],
+    "responses": ["Hola!", "Buenas", "Hola, puedo ayudarte en algo?"],
+    "context_set": ""
+  },
+  {"tag": "goodbye",
+    "patterns": ["cya", "Adios", "Chau", "Me voy", "Nos vemos", "Hasta luego", "cao", "see ya"],
+    "responses": ["Hasta luego!", "Hablame si necesitas algo", "Adios!"],
+    "context_set": ""
+  },
+  {"tag": "recipes",
+    "patterns": ["¿Qué debería cocinas?", "Qué debería hacer?", "¿Qué me recomiendas cocinar?", "Receta"],
+    "responses": ["Pollo a la brasa","Ceviche"],
+    "context_set": ""
+  }
+]
+}

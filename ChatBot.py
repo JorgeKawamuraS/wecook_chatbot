@@ -1,60 +1,65 @@
-import re
 import random
+import json
+import pickle
+import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
+import nltk
+from nltk.stem import WordNetLemmatizer
+
+from keras.models import load_model
+
+lemmatizer = WordNetLemmatizer()
+
+intents = json.loads(open('intents.json').read())
+
+words = pickle.load(open('words.pkl', 'rb'))
+classes = pickle.load(open('classes.pkl', 'rb'))
+model = load_model('chatbot_mode.model')
 origins = [
     "http://localhost",
     "http://localhost:4200",
 ]
 
-def get_response(user_input):
-    split_message = re.split(r'\s|[,:;.?!-_]\s*', user_input.lower())
-    print(split_message)
-    response = check_all_messages(split_message)
-    return response
+def clean_up_sentence(sentence):
+    sentence_words = nltk.word_tokenize(sentence)
+    sentence_words = [lemmatizer.lemmatize(word) for word in sentence_words]
+    return sentence_words
 
-def message_probability(user_message, recognized_words, single_response=False, required_word=[]):
-    message_certainty = 0
-    has_required_words = True
 
-    for word in user_message:
-        if word in recognized_words:
-            message_certainty += 1
+def bag_of_words(sentece):
+    sentence_words = clean_up_sentence(sentece)
+    bag = [0] * len(words)
+    for w in sentence_words:
+        for i, word in enumerate(words):
+            if word == w:
+                bag[i] = 1
+    return np.array(bag)
 
-    percentage = float(message_certainty) / float(len(recognized_words))
 
-    for word in required_word:
-        if word not in user_message:
-            has_required_words = False
+def predict_class(sentence):
+    bow = bag_of_words(sentence)
+    res = model.predict(np.array([bow]))[0]
+    ERROR_THRESHOLD = 0.25
+    result = [[i, r] for i, r in enumerate(res) if r > ERROR_THRESHOLD]
+
+    result.sort(key=lambda x: x[1], reverse=True)
+    return_list = []
+    for r in result:
+        return_list.append({'intent': classes[r[0]], 'probability': str(r[1])})
+    return return_list
+
+
+def get_response(intents_list, intents_json):
+    tag = intents_list[0]['intent']
+    list_of_intents = intents_json['intents']
+    for i in list_of_intents:
+        if i['tag'] == tag:
+            result = random.choice(i['responses'])
             break
-    if has_required_words or single_response:
-        return int(percentage * 100)
-    else:
-        return 0
-
-def check_all_messages(message):
-    highest_prob = {}
-
-    def response(bot_response, list_of_words, single_response=False, required_words=[]):
-        nonlocal highest_prob
-        highest_prob[bot_response] = message_probability(message, list_of_words, single_response, required_words)
-
-    response('Hola. ¿Hay algo con lo que te pueda ayudar?', ['hola', 'hi', 'saludos', 'buenas'], single_response=True)
-    response('Hoy deberías cocinar '+ ['Pollo al Horno', 'Ceviche', 'Lentejitas'][
-        random.randrange(3)], ['recomiendas', 'cocinar', 'debería', 'hacer','preparar'], single_response=True)
-    response('¿Estoy bien y tú, te puedo ayudar en algo?', ['como', 'estas', 'va', 'vas', 'sientes'], required_words=['como'])
-
-    best_match = max(highest_prob, key=highest_prob.get)
-
-    return unknown() if highest_prob[best_match] < 1 else best_match
-
-
-def unknown():
-    response = ['¿Puedes decirlo de nuevo?', 'No estoy seguro de lo quieres', 'Por favor, reformula tu consulta'][
-        random.randrange(3)]
-    return response
+    return result
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,7 +74,6 @@ def ask(request = None):
     if request is None:
         text = 'No ha recibido nada'
     else:
-        text = get_response(request)
+        ints = predict_class(request)
+        text = get_response(ints, intents)
     return text
-
-
